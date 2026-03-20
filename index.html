@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ReviewPulse — Review Intelligence</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Geist+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --gold:        #f0a500;
+    --gold-light:  #ffc233;
+    --gold-dim:    rgba(240,165,0,.10);
+    --sb-bg:       #0b0f1a;
+    --sb-border:   rgba(255,255,255,.06);
+    --sb-text:     #6b7a99;
+    --bg:          #f8f9fc;
+    --white:       #ffffff;
+    --border:      #e5e7eb;
+    --border-lt:   #f3f4f6;
+    --t1:          #111827;
+    --t2:          #374151;
+    --t3:          #6b7280;
+    --t4:          #9ca3af;
+    --green:       #16a34a; --green-bg: #dcfce7;
+    --red:         #dc2626; --red-bg:   #fee2e2;
+    --amber:       #d97706; --amber-bg: #fef3c7;
+    --blue:        #1d4ed8; --blue-bg:  #dbeafe;
+  }
+  * { font-family:'Syne',sans-serif; box-sizing:border-box; margin:0; padding:0; }
+  .mono { font-family:'Geist Mono',monospace; }
+  html,body { height:100%; overflow:hidden; background:var(--bg); }
+
+  .app { display:flex; height:100vh; overflow:hidden; }
+
+  /* ── SIDEBAR — never scrolls, always visible ── */
+  .sidebar {
+    width:220px; flex-shrink:0; background:var(--sb-bg);
+    display:flex; flex-direction:column;
+    height:100vh; overflow:hidden;
+    border-right:1px solid var(--sb-border);
+  }
+  .main-area { flex:1; display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+  .topbar { flex-shrink:0; background:var(--white); border-bottom:1px solid var(--border); padding:12px 28px; display:flex; align-items:center; justify-content:space-between; }
+  .page-scroll { flex:1; overflow-y:auto; padding:22px 26px; display:flex; flex-direction:column; gap:16px; }
+  .page-scroll::-webkit-scrollbar { width:5px; }
+  .page-scroll::-webkit-scrollbar-track { background:transparent; }
+  .page-scroll::-webkit-scrollbar-thumb { background:#d1d5db; border-radius:4px; }
+
+  /* ── SIDEBAR PARTS ── */
+  .sb-logo { padding:20px 18px 16px; border-bottom:1px solid var(--sb-border); flex-shrink:0; }
+  .sb-wordmark { font-size:16px; font-weight:800; letter-spacing:-.4px; color:#fff; }
+  .sb-wordmark span { color:var(--gold); }
+  .sb-sub { font-size:9.5px; color:var(--sb-text); margin-top:3px; font-family:'Geist Mono',monospace; }
+  .sb-nav { flex:1; overflow-y:auto; padding:6px 0; }
+  .sb-nav::-webkit-scrollbar { width:0; }
+  .nav-section { padding:12px 18px 4px; font-size:9px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#253550; }
+  .nav-item { display:flex; align-items:center; gap:9px; margin:1px 8px; padding:7px 10px; border-radius:8px; font-size:12.5px; font-weight:500; color:var(--sb-text); cursor:pointer; transition:all .15s; position:relative; }
+  .nav-item:hover { background:rgba(255,255,255,.04); color:#c8d5e8; }
+  .nav-item.active { background:var(--gold-dim); color:var(--gold); font-weight:600; }
+  .nav-item.active::before { content:''; position:absolute; left:-8px; top:50%; transform:translateY(-50%); width:3px; height:16px; background:var(--gold); border-radius:0 3px 3px 0; }
+  .nav-ic { width:26px; height:26px; border-radius:7px; flex-shrink:0; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.04); transition:background .15s; }
+  .nav-item.active .nav-ic { background:rgba(240,165,0,.14); }
+  .nav-item:hover .nav-ic { background:rgba(255,255,255,.07); }
+  .nav-badge { margin-left:auto; background:var(--red); color:#fff; font-size:9px; padding:1px 5px; border-radius:100px; font-family:'Geist Mono',monospace; }
+  .nav-divider { height:1px; background:var(--sb-border); margin:6px 16px; }
+  .sb-user { flex-shrink:0; margin:8px; padding:9px 10px; border-radius:10px; border:1px solid var(--sb-border); display:flex; align-items:center; gap:9px; cursor:pointer; transition:background .15s; }
+  .sb-user:hover { background:rgba(255,255,255,.04); }
+  .sb-avatar { width:28px; height:28px; border-radius:8px; flex-shrink:0; background:linear-gradient(135deg,var(--gold),#e07000); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:800; color:#000; }
+  .sb-uname { font-size:11.5px; font-weight:600; color:#c8d5e8; }
+  .sb-urole { font-size:9.5px; color:var(--sb-text); font-family:'Geist Mono',monospace; }
+
+  /* ── BUTTONS ── */
+  .btn-gold { display:flex; align-items:center; gap:5px; background:var(--gold); color:#000; font-size:11.5px; font-weight:800; padding:7px 13px; border-radius:8px; border:none; cursor:pointer; transition:all .15s; font-family:'Syne',sans-serif; }
+  .btn-gold:hover { background:var(--gold-light); box-shadow:0 4px 14px rgba(240,165,0,.25); }
+  .btn-ghost { display:flex; align-items:center; gap:5px; background:transparent; color:var(--t2); font-size:11.5px; font-weight:600; padding:7px 12px; border-radius:8px; border:1px solid var(--border); cursor:pointer; font-family:'Syne',sans-serif; }
+  .btn-ghost:hover { background:var(--bg); }
+  .btn-alert { display:flex; align-items:center; gap:5px; background:var(--red-bg); color:var(--red); font-size:11px; font-weight:700; padding:6px 11px; border-radius:8px; border:1px solid #fecaca; cursor:pointer; font-family:'Syne',sans-serif; }
+  .time-sel { font-size:11.5px; font-weight:600; border:1px solid var(--border); border-radius:8px; padding:7px 11px; background:var(--white); color:var(--t2); cursor:pointer; outline:none; }
+
+  /* ── CARDS ── */
+  .card { background:var(--white); border:1px solid var(--border); border-radius:13px; }
+  .kpi-card { transition:box-shadow .2s,transform .2s; }
+  .kpi-card:hover { box-shadow:0 6px 24px rgba(0,0,0,.07); transform:translateY(-2px); }
+  .track { height:5px; background:var(--border-lt); border-radius:3px; overflow:hidden; }
+  .fill  { height:100%; border-radius:3px; transition:width 1.2s cubic-bezier(.34,1.56,.64,1); }
+
+  /* ── TABLE ── */
+  table { width:100%; border-collapse:collapse; }
+  thead th { text-align:left; font-size:10px; font-weight:700; color:var(--t4); letter-spacing:.08em; text-transform:uppercase; padding:9px 14px; border-bottom:1px solid var(--border-lt); background:var(--bg); }
+  tbody tr { border-bottom:1px solid var(--border-lt); transition:background .12s; cursor:pointer; }
+  tbody tr:hover { background:#fffdf5; }
+  tbody td { padding:10px 14px; font-size:12.5px; color:var(--t2); vertical-align:middle; }
+  tbody tr:last-child { border-bottom:none; }
+
+  /* ── BADGES ── */
+  .tag { display:inline-flex; align-items:center; padding:2px 8px; border-radius:100px; font-size:10.5px; font-weight:600; }
+  .tag-pos { background:var(--green-bg); color:var(--green); }
+  .tag-neg { background:var(--red-bg); color:var(--red); }
+  .tag-neu { background:var(--amber-bg); color:var(--amber); }
+  .pbadge { display:inline-block; padding:2px 7px; border-radius:5px; font-size:9.5px; font-weight:800; letter-spacing:.04em; }
+  .p-amazon   { background:#fff3cd; color:#92400e; }
+  .p-flipkart { background:#dbeafe; color:#1e40af; }
+  .p-google   { background:#dcfce7; color:#166534; }
+  .p-myntra   { background:#fce7f3; color:#9d174d; }
+  .p-nykaa    { background:#f3e8ff; color:#5b21b6; }
+  .status { display:inline-block; padding:2px 7px; border-radius:100px; font-size:9.5px; font-weight:700; }
+  .s-open    { background:var(--red-bg); color:var(--red); }
+  .s-replied { background:var(--green-bg); color:var(--green); }
+  .s-pending { background:var(--amber-bg); color:var(--amber); }
+  .stars { color:#d97706; font-size:11px; letter-spacing:.5px; }
+  .trend-up   { color:var(--green); background:var(--green-bg); padding:2px 7px; border-radius:100px; font-size:10.5px; font-weight:700; }
+  .trend-down { color:var(--red); background:var(--red-bg); padding:2px 7px; border-radius:100px; font-size:10.5px; font-weight:700; }
+
+  /* ── CHIPS ── */
+  .pchip { display:inline-flex; align-items:center; gap:5px; padding:5px 11px; border-radius:8px; border:1px solid var(--border); font-size:11.5px; font-weight:600; color:var(--t2); cursor:pointer; transition:all .15s; background:var(--white); }
+  .pchip:hover,.pchip.active { border-color:var(--gold); color:var(--gold); background:var(--gold-dim); }
+  .pchip-cnt { background:#f3f4f6; color:var(--t3); font-size:9.5px; padding:1px 5px; border-radius:100px; font-family:'Geist Mono',monospace; }
+  .pchip.active .pchip-cnt { background:rgba(240,165,0,.18); color:var(--gold); }
+  .tchip { display:inline-flex; align-items:center; gap:5px; padding:5px 10px; border-radius:7px; border:1px solid var(--border); font-size:11px; font-weight:600; color:var(--t2); cursor:pointer; transition:all .15s; background:var(--white); }
+  .tchip:hover,.tchip.active { border-color:var(--gold); color:var(--gold); background:var(--gold-dim); }
+  .tcnt { font-size:9.5px; padding:1px 5px; border-radius:100px; font-family:'Geist Mono',monospace; background:#f3f4f6; color:var(--t3); }
+  .tchip.active .tcnt { background:rgba(240,165,0,.18); color:var(--gold); }
+  .tcnt.alert { background:var(--red-bg); color:var(--red); }
+  .tcnt.good  { background:var(--green-bg); color:var(--green); }
+
+  /* ── INSIGHT CARDS ── */
+  .ic { padding:11px 13px; border-radius:9px; border-left:3px solid; margin-bottom:8px; }
+  .ic:last-child { margin-bottom:0; }
+  .ic-crit { border-color:var(--red);   background:#fff8f8; }
+  .ic-pos  { border-color:var(--green); background:#f0fdf4; }
+  .ic-opp  { border-color:var(--amber); background:#fffdf0; }
+  .ic-warn { border-color:var(--blue);  background:#eff6ff; }
+
+  /* ── COMPOSER ── */
+  .composer-area { width:100%; border:1px solid var(--border); border-radius:9px; padding:10px 12px; font-size:12px; color:var(--t2); resize:none; outline:none; font-family:'Syne',sans-serif; transition:border-color .2s; background:#f9fafb; line-height:1.6; }
+  .composer-area:focus { border-color:var(--gold); background:var(--white); box-shadow:0 0 0 3px rgba(240,165,0,.09); }
+  .tone-btn { font-size:10.5px; font-weight:600; padding:3px 9px; border-radius:7px; border:1px solid var(--border); color:var(--t3); cursor:pointer; background:var(--white); transition:all .12s; font-family:'Syne',sans-serif; }
+  .tone-btn:hover,.tone-btn.active { border-color:var(--gold); color:var(--gold); background:var(--gold-dim); }
+
+  /* ── ANIMATIONS ── */
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
+  .live-dot { width:6px; height:6px; border-radius:50%; background:var(--green); display:inline-block; animation:pulse 2s infinite; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+  .a1{animation:fadeUp .4s ease .05s both} .a2{animation:fadeUp .4s ease .10s both}
+  .a3{animation:fadeUp .4s ease .15s both} .a4{animation:fadeUp .4s ease .20s both}
+  .a5{animation:fadeUp .4s ease .25s both} .a6{animation:fadeUp .4s ease .30s both}
+
+  @media(max-width:1024px){ .sidebar{display:none} }
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ══ SIDEBAR ══ -->
+<aside class="sidebar">
+  <div class="sb-logo">
+    <div class="sb-wordmark">Review<span>Pulse</span></div>
+    <div class="sb-sub">v2.4 · 4 platforms connected</div>
+  </div>
+  <nav class="sb-nav">
+    <div class="nav-section">Overview</div>
+    <div class="nav-item active"><div class="nav-ic"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>Dashboard</div>
+    <div class="nav-item"><div class="nav-ic"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>Sentiment Trends</div>
+    <div class="nav-item"><div class="nav-ic"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>Response Time</div>
+    <div class="nav-divider"></div>
+    <div class="nav-section">Reviews</div>
+    <div class="nav-item"><div class="nav-ic"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>Inbox<span class="nav-badge">47</span></div>
+    <div class="nav-item"><div class="nav-ic"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>Responded</div>
+    <div class="nav-item"><div class="nav-ic"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>Flagged Critical<span class="nav-badge">12</span></div>
+    <div class="nav-divider"></div>
+    <div class="nav-section">Intelligence</div>
+    <div class="nav-item"><div class="nav-ic"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>AI Insights</div>
+    <div class="nav-item"><div class="nav-ic"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>Competitors</div>
+    <div class="nav-item"><div class="nav-ic"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg></div>Weekly Report</div>
+    <div class="nav-divider"></div>
+    <div class="nav-section">Account</div>
+    <div class="nav-item"><div class="nav-ic"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M12 2v2M12 20v2M2 12h2M20 12h2"/></svg></div>Integrations</div>
+  </nav>
+  <div class="sb-user">
+    <div class="sb-avatar">SK</div>
+    <div><div class="sb-uname">Sneha Kapoor</div><div class="sb-urole">Brand Manager</div></div>
+    <svg style="margin-left:auto;flex-shrink:0" width="12" height="12" fill="none" stroke="#2d3f58" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+  </div>
+</aside>
+
+<!-- ══ MAIN ══ -->
+<div class="main-area">
+  <header class="topbar">
+    <div>
+      <div style="font-size:15px;font-weight:700;color:var(--t1);letter-spacing:-.3px">Review Command Centre</div>
+      <div style="font-size:11px;color:var(--t4);margin-top:2px;display:flex;align-items:center;gap:5px"><span class="live-dot"></span>Synced · Amazon, Flipkart, Google, Myntra · 3 min ago</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="btn-alert"><svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm1 14h-2v-2h2v2zm0-4h-2V8h2v4z"/></svg>12 critical unresponded</button>
+      <select class="time-sel"><option>Last 30 days</option><option>Last 7 days</option><option>Last 90 days</option></select>
+      <button class="btn-ghost"><svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export CSV</button>
+      <button class="btn-gold"><svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Sync Now</button>
+    </div>
+  </header>
+
+  <div class="page-scroll">
+
+    <!-- PLATFORM FILTER -->
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap" class="a1">
+      <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--t4)">Platform:</span>
+      <button onclick="setPlatform(this)" class="pchip active platform-btn">All <span class="pchip-cnt">3,000</span></button>
+      <button onclick="setPlatform(this)" class="pchip platform-btn">🟠 Amazon <span class="pchip-cnt">1,240</span></button>
+      <button onclick="setPlatform(this)" class="pchip platform-btn">🔵 Flipkart <span class="pchip-cnt">780</span></button>
+      <button onclick="setPlatform(this)" class="pchip platform-btn">🟢 Google <span class="pchip-cnt">490</span></button>
+      <button onclick="setPlatform(this)" class="pchip platform-btn">🩷 Myntra <span class="pchip-cnt">310</span></button>
+      <button onclick="setPlatform(this)" class="pchip platform-btn">🟣 Nykaa <span class="pchip-cnt">180</span></button>
+    </div>
+
+    <!-- KPI ROW -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px" class="a2">
+      <div class="card kpi-card" style="padding:18px 20px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between">
+          <div><p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--t4)">Total Reviews</p><p style="font-size:28px;font-weight:700;color:var(--t1);margin-top:6px" class="mono">3,000</p></div>
+          <span class="trend-up" style="margin-top:2px">↑ 18%</span>
+        </div>
+        <p style="font-size:11px;color:var(--t4);margin-top:8px">vs last month <span style="font-weight:600;color:var(--t2)">2,542</span></p>
+      </div>
+      <div class="card kpi-card" style="padding:18px 20px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between">
+          <div><p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--t4)">Positive Sentiment</p><p style="font-size:28px;font-weight:700;color:var(--green);margin-top:6px" class="mono">68%</p></div>
+          <span class="trend-up" style="margin-top:2px">↑ 4%</span>
+        </div>
+        <div class="track" style="margin-top:10px"><div class="fill" style="width:68%;background:var(--green)"></div></div>
+      </div>
+      <div class="card kpi-card" style="padding:18px 20px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between">
+          <div><p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--t4)">Response Rate</p><p style="font-size:28px;font-weight:700;color:var(--gold);margin-top:6px" class="mono">43%</p></div>
+          <span class="trend-down" style="margin-top:2px">↓ 7%</span>
+        </div>
+        <div class="track" style="margin-top:10px"><div class="fill" style="width:43%;background:var(--gold)"></div></div>
+      </div>
+      <div class="card kpi-card" style="padding:18px 20px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between">
+          <div><p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--t4)">Avg. Rating</p><p style="font-size:28px;font-weight:700;color:var(--amber);margin-top:6px" class="mono">4.1 ★</p></div>
+          <span class="trend-down" style="margin-top:2px">↓ 0.3</span>
+        </div>
+        <p style="font-size:10.5px;font-weight:700;color:var(--red);background:var(--red-bg);display:inline-block;padding:2px 7px;border-radius:5px;margin-top:8px">⚠ Amazon: 3.8 at risk</p>
+      </div>
+    </div>
+
+    <!-- CHART ROW -->
+    <div style="display:grid;grid-template-columns:1fr 255px 235px;gap:14px" class="a3">
+      <div class="card" style="padding:20px 22px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px">
+          <div><h2 style="font-size:14px;font-weight:700;color:var(--t1)">Sentiment Trend</h2><p style="font-size:11px;color:var(--t4);margin-top:2px">6-month breakdown</p></div>
+          <div style="display:flex;gap:12px;font-size:11px;color:var(--t3)">
+            <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:2px;background:var(--green);border-radius:2px;display:inline-block"></span>Positive</span>
+            <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:2px;background:var(--red);border-radius:2px;display:inline-block"></span>Negative</span>
+            <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:2px;background:var(--amber);border-radius:2px;display:inline-block"></span>Neutral</span>
+          </div>
+        </div>
+        <div style="height:165px"><canvas id="sentimentChart"></canvas></div>
+      </div>
+      <div class="card" style="padding:20px 22px">
+        <h2 style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:14px">Platform Ratings</h2>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:5px"><span class="pbadge p-amazon">AMAZON</span><span class="mono" style="font-weight:700;color:var(--t1)">3.8 <span style="color:var(--t4)">★</span></span></div><div class="track"><div class="fill" style="width:76%;background:#d97706"></div></div></div>
+          <div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:5px"><span class="pbadge p-flipkart">FLIPKART</span><span class="mono" style="font-weight:700;color:var(--t1)">4.3 <span style="color:var(--t4)">★</span></span></div><div class="track"><div class="fill" style="width:86%;background:#1d4ed8"></div></div></div>
+          <div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:5px"><span class="pbadge p-google">GOOGLE</span><span class="mono" style="font-weight:700;color:var(--t1)">4.5 <span style="color:var(--t4)">★</span></span></div><div class="track"><div class="fill" style="width:90%;background:#16a34a"></div></div></div>
+          <div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:5px"><span class="pbadge p-myntra">MYNTRA</span><span class="mono" style="font-weight:700;color:var(--t1)">3.6 <span style="color:var(--t4)">★</span></span></div><div class="track"><div class="fill" style="width:72%;background:#be185d"></div></div></div>
+          <div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:5px"><span class="pbadge p-nykaa">NYKAA</span><span class="mono" style="font-weight:700;color:var(--t1)">4.1 <span style="color:var(--t4)">★</span></span></div><div class="track"><div class="fill" style="width:82%;background:#7e22ce"></div></div></div>
+        </div>
+      </div>
+      <div class="card" style="padding:20px 22px;display:flex;flex-direction:column">
+        <h2 style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:12px">This Month</h2>
+        <div style="display:flex;justify-content:center;margin-bottom:10px"><canvas id="donutChart" width="110" height="110"></canvas></div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:auto">
+          <div style="display:flex;justify-content:space-between;align-items:center"><span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t3)"><span style="width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block"></span>Positive</span><span class="mono" style="font-size:11px;font-weight:700;color:var(--t1)">68% · 2,040</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center"><span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t3)"><span style="width:7px;height:7px;border-radius:50%;background:var(--amber);display:inline-block"></span>Neutral</span><span class="mono" style="font-size:11px;font-weight:700;color:var(--t1)">15% · 450</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center"><span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t3)"><span style="width:7px;height:7px;border-radius:50%;background:var(--red);display:inline-block"></span>Negative</span><span class="mono" style="font-size:11px;font-weight:700;color:var(--t1)">17% · 510</span></div>
+          <div style="border-top:1px solid var(--border-lt);padding-top:7px;margin-top:3px;display:flex;flex-direction:column;gap:4px">
+            <div style="display:flex;justify-content:space-between"><span style="font-size:11px;color:var(--t4)">Avg. response time</span><span class="mono" style="font-size:11px;font-weight:700;color:var(--amber)">38 hrs</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="font-size:11px;color:var(--t4)">Unresponded critical</span><span class="mono" style="font-size:11px;font-weight:700;color:var(--red)">47</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="font-size:11px;color:var(--t4)">NPS proxy</span><span class="mono" style="font-size:11px;font-weight:700;color:var(--green)">+34</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOPIC CLUSTERS -->
+    <div class="card a4" style="padding:16px 20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px">
+        <h2 style="font-size:14px;font-weight:700;color:var(--t1)">Topic Clusters <span style="font-size:11px;font-weight:500;color:var(--t4)">· AI-detected themes</span></h2>
+        <span style="font-size:11px;font-weight:600;color:var(--gold);cursor:pointer">View all →</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:7px" id="topicClusters">
+        <button onclick="setTopic(this)" class="tchip active">All <span class="tcnt">3,000</span></button>
+        <button onclick="setTopic(this)" class="tchip">📐 Sizing <span class="tcnt alert">127 ↑</span></button>
+        <button onclick="setTopic(this)" class="tchip">🚚 Delivery <span class="tcnt">98</span></button>
+        <button onclick="setTopic(this)" class="tchip">💎 Quality <span class="tcnt">211</span></button>
+        <button onclick="setTopic(this)" class="tchip">📦 Packaging <span class="tcnt good">183 ↑</span></button>
+        <button onclick="setTopic(this)" class="tchip">↩️ Returns <span class="tcnt">74</span></button>
+        <button onclick="setTopic(this)" class="tchip">💰 Price <span class="tcnt">92</span></button>
+        <button onclick="setTopic(this)" class="tchip">🌐 Language <span class="tcnt">34</span></button>
+        <button onclick="setTopic(this)" class="tchip">⚠️ Fake Product <span class="tcnt alert">29 ↑</span></button>
+      </div>
+    </div>
+
+    <!-- TABLE + INSIGHTS -->
+    <div style="display:grid;grid-template-columns:1fr 315px;gap:14px" class="a5">
+      <div class="card" style="overflow:hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid var(--border-lt);background:var(--bg)">
+          <h2 style="font-size:14px;font-weight:700;color:var(--t1)">Recent Reviews <span style="font-size:11px;font-weight:500;color:var(--t4)">· urgency sorted</span></h2>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="text" placeholder="Search…" style="font-size:11.5px;border:1px solid var(--border);border-radius:8px;padding:5px 10px;outline:none;width:120px;background:var(--white);color:var(--t2);font-family:'Syne',sans-serif" onfocus="this.style.borderColor='var(--gold)'" onblur="this.style.borderColor='var(--border)'"/>
+            <select style="font-size:11.5px;border:1px solid var(--border);border-radius:8px;padding:5px 8px;background:var(--white);color:var(--t2);cursor:pointer;outline:none"><option>All Ratings</option><option>1–2 ★</option><option>3 ★</option><option>4–5 ★</option></select>
+          </div>
+        </div>
+        <div style="overflow-x:auto"><table><thead><tr><th>Reviewer</th><th>Platform</th><th>Rating</th><th>Sentiment</th><th>Topic</th><th>Status</th><th>Date</th><th></th></tr></thead><tbody id="reviewTable"></tbody></table></div>
+        <div style="padding:9px 16px;border-top:1px solid var(--border-lt);display:flex;align-items:center;justify-content:space-between;background:var(--bg)">
+          <span class="mono" style="font-size:10.5px;color:var(--t4)">Showing 8 of 3,000</span>
+          <div style="display:flex;gap:4px">
+            <button style="font-size:10.5px;padding:3px 9px;border:1px solid var(--border);border-radius:7px;color:var(--t3);cursor:pointer;background:var(--white)">← Prev</button>
+            <button style="font-size:10.5px;padding:3px 9px;border-radius:7px;background:var(--gold);color:#000;font-weight:800;border:none;cursor:pointer">1</button>
+            <button style="font-size:10.5px;padding:3px 9px;border:1px solid var(--border);border-radius:7px;color:var(--t3);cursor:pointer;background:var(--white)">2</button>
+            <button style="font-size:10.5px;padding:3px 9px;border:1px solid var(--border);border-radius:7px;color:var(--t3);cursor:pointer;background:var(--white)">3</button>
+            <button style="font-size:10.5px;padding:3px 9px;border:1px solid var(--border);border-radius:7px;color:var(--t3);cursor:pointer;background:var(--white)">Next →</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="card" style="padding:16px 18px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            <div style="width:24px;height:24px;border-radius:7px;background:var(--gold-dim);display:flex;align-items:center;justify-content:center"><svg width="12" height="12" fill="none" stroke="var(--gold)" stroke-width="2.5" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+            <h2 style="font-size:14px;font-weight:700;color:var(--t1)">AI Insights</h2>
+            <span style="margin-left:auto;font-size:10px;font-weight:700;background:var(--gold-dim);color:var(--gold);padding:2px 7px;border-radius:5px">4 new</span>
+          </div>
+          <div class="ic ic-crit"><div style="display:flex;gap:8px"><span style="font-size:13px;flex-shrink:0">🚨</span><div><p style="font-size:11.5px;font-weight:700;color:var(--t1)">Sizing spike on Myntra</p><p style="font-size:11px;color:var(--t3);margin-top:3px;line-height:1.5">127 complaints in 7 days — tied to size chart update Mar 12.</p><button style="font-size:10.5px;font-weight:600;color:var(--red);margin-top:4px;background:none;border:none;cursor:pointer;padding:0">→ Fix size chart</button></div></div></div>
+          <div class="ic ic-pos"><div style="display:flex;gap:8px"><span style="font-size:13px;flex-shrink:0">📈</span><div><p style="font-size:11.5px;font-weight:700;color:var(--t1)">Packaging trending positive</p><p style="font-size:11px;color:var(--t3);margin-top:3px;line-height:1.5">183 positive mentions since new box design.</p><button style="font-size:10.5px;font-weight:600;color:var(--green);margin-top:4px;background:none;border:none;cursor:pointer;padding:0">→ Amplify on social</button></div></div></div>
+          <div class="ic ic-opp"><div style="display:flex;gap:8px"><span style="font-size:13px;flex-shrink:0">💡</span><div><p style="font-size:11.5px;font-weight:700;color:var(--t1)">Regional language gap</p><p style="font-size:11px;color:var(--t3);margin-top:3px;line-height:1.5">89 reviews request Hindi manual. Quick win.</p><button style="font-size:10.5px;font-weight:600;color:var(--amber);margin-top:4px;background:none;border:none;cursor:pointer;padding:0">→ Add to backlog</button></div></div></div>
+          <div class="ic ic-warn"><div style="display:flex;gap:8px"><span style="font-size:13px;flex-shrink:0">⚠️</span><div><p style="font-size:11.5px;font-weight:700;color:var(--t1)">Amazon rating at risk</p><p style="font-size:11px;color:var(--t3);margin-top:3px;line-height:1.5">4.4 → 3.8 in 14 days. 23 unresponded — act within 24h.</p><button style="font-size:10.5px;font-weight:600;color:var(--blue);margin-top:4px;background:none;border:none;cursor:pointer;padding:0">→ View critical</button></div></div></div>
+        </div>
+        <div class="card" style="padding:16px 18px">
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px">
+            <div style="width:20px;height:20px;border-radius:6px;background:var(--gold-dim);display:flex;align-items:center;justify-content:center"><svg width="10" height="10" fill="none" stroke="var(--gold)" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+            <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--t3)">AI Reply Composer</span>
+          </div>
+          <p style="font-size:11px;color:var(--t4);margin-bottom:8px">Drafting for: <span style="font-weight:600;color:var(--t2)">Priya M. · Amazon · 2★</span></p>
+          <textarea class="composer-area" rows="3">Thank you, Priya. We sincerely apologise — a priority replacement has been raised and our team will contact you within 24 hours.</textarea>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px">
+            <div style="display:flex;gap:6px">
+              <button class="tone-btn active">Empathetic</button>
+              <button class="tone-btn">Formal</button>
+              <button class="tone-btn">Concise</button>
+            </div>
+            <button class="btn-gold" style="font-size:11px;padding:5px 12px">Send ↗</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESPONSE METRICS -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px" class="a6">
+      <div class="card" style="padding:18px 20px">
+        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--t4);margin-bottom:10px">Response Rate Goal</p>
+        <div style="display:flex;align-items:flex-end;gap:7px"><span class="mono" style="font-size:22px;font-weight:700;color:var(--gold)">43%</span><span style="font-size:11px;color:var(--t4);padding-bottom:3px">of 80% target</span></div>
+        <div class="track" style="margin-top:10px"><div class="fill" style="width:43%;background:var(--gold)"></div></div>
+        <p style="font-size:11px;color:var(--t4);margin-top:7px">Need <span class="mono" style="font-weight:600;color:var(--t2)">1,107</span> more replies to hit goal</p>
+      </div>
+      <div class="card" style="padding:18px 20px">
+        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--t4);margin-bottom:10px">Avg. Time to Respond</p>
+        <div style="display:flex;align-items:flex-end;gap:7px"><span class="mono" style="font-size:22px;font-weight:700;color:var(--amber)">38 hrs</span><span class="trend-down" style="margin-bottom:3px">↑ 12 hrs</span></div>
+        <p style="font-size:11px;color:var(--t4);margin-top:10px">Amazon recommends <span style="font-weight:600;color:var(--t2)">24 hrs</span> to protect ranking</p>
+      </div>
+      <div class="card" style="padding:18px 20px">
+        <p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--t4);margin-bottom:10px">NPS Proxy Score</p>
+        <div style="display:flex;align-items:flex-end;gap:7px"><span class="mono" style="font-size:22px;font-weight:700;color:var(--green)">+34</span><span class="trend-up" style="margin-bottom:3px">↑ 8 pts</span></div>
+        <p style="font-size:11px;color:var(--t4);margin-top:10px">4–5★ promoters vs 1–2★ detractors ratio</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+  const reviews = [
+    {name:"Priya M.",  pb:"p-amazon",  pl:"Amazon",  st:"★★☆☆☆",s:"neg",sl:"Negative",t:"Delivery", ss:"open",   ssl:"Open",   d:"2h ago",   tx:"Wrong item shipped, packaging damaged."},
+    {name:"Rahul T.",  pb:"p-google",  pl:"Google",  st:"★★★★★",s:"pos",sl:"Positive",t:"Quality",  ss:"replied",ssl:"Replied",d:"5h ago",   tx:"Love it! Recommended to 3 friends."},
+    {name:"Anjali S.", pb:"p-flipkart",pl:"Flipkart",st:"★★★☆☆",s:"neu",sl:"Neutral", t:"Language", ss:"pending",ssl:"Pending",d:"Yesterday",tx:"Delivery late. No Hindi manual."},
+    {name:"Kiran V.",  pb:"p-myntra",  pl:"Myntra",  st:"★☆☆☆☆",s:"neg",sl:"Negative",t:"Sizing",   ss:"open",   ssl:"Open",   d:"Yesterday",tx:"Size chart completely wrong."},
+    {name:"Meena R.",  pb:"p-nykaa",   pl:"Nykaa",   st:"★★★★☆",s:"pos",sl:"Positive",t:"Packaging",ss:"replied",ssl:"Replied",d:"2d ago",   tx:"Beautiful packaging, great value."},
+    {name:"Suresh P.", pb:"p-amazon",  pl:"Amazon",  st:"★☆☆☆☆",s:"neg",sl:"Negative",t:"Fake",     ss:"open",   ssl:"Open",   d:"2d ago",   tx:"Received a fake product."},
+    {name:"Deepa K.",  pb:"p-flipkart",pl:"Flipkart",st:"★★★★★",s:"pos",sl:"Positive",t:"Quality",  ss:"replied",ssl:"Replied",d:"3d ago",   tx:"Exactly as described. Fast delivery!"},
+    {name:"Arjun N.",  pb:"p-google",  pl:"Google",  st:"★★☆☆☆",s:"neg",sl:"Negative",t:"Returns",  ss:"pending",ssl:"Pending",d:"3d ago",   tx:"Return request ignored for 2 weeks."},
+  ];
+
+  document.getElementById('reviewTable').innerHTML = reviews.map((r,i)=>`
+    <tr style="animation:fadeUp .35s ease ${i*.05}s both">
+      <td><div style="display:flex;align-items:center;gap:9px"><div style="width:26px;height:26px;border-radius:7px;background:var(--gold-dim);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--gold);flex-shrink:0">${r.name[0]}</div><div><div style="font-size:12px;font-weight:600;color:var(--t1)">${r.name}</div><div class="mono" style="font-size:10px;color:var(--t4)">${r.tx.substring(0,26)}…</div></div></div></td>
+      <td><span class="pbadge ${r.pb}">${r.pl}</span></td>
+      <td><span class="stars">${r.st}</span></td>
+      <td><span class="tag tag-${r.s}">${r.sl}</span></td>
+      <td style="font-size:11.5px;font-weight:600;color:var(--t2)">${r.t}</td>
+      <td><span class="status s-${r.ss}">${r.ssl}</span></td>
+      <td class="mono" style="font-size:10.5px;color:var(--t4)">${r.d}</td>
+      <td><button style="font-size:11px;font-weight:700;color:var(--gold);background:none;border:none;cursor:pointer;white-space:nowrap">Reply ✦</button></td>
+    </tr>
+  `).join('');
+
+  function setPlatform(el){ document.querySelectorAll('.platform-btn').forEach(b=>b.classList.remove('active')); el.classList.add('active'); }
+  function setTopic(el){ document.querySelectorAll('#topicClusters button').forEach(b=>b.classList.remove('active')); el.classList.add('active'); }
+  document.querySelectorAll('.tone-btn').forEach(btn=>{ btn.addEventListener('click',()=>{ btn.closest('.card').querySelectorAll('.tone-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); }); });
+
+  new Chart(document.getElementById('sentimentChart').getContext('2d'),{
+    type:'line',
+    data:{labels:['Sep','Oct','Nov','Dec','Jan','Feb'],datasets:[
+      {label:'Positive',data:[55,60,52,63,65,68],borderColor:'#16a34a',backgroundColor:'rgba(22,163,74,.06)',tension:.4,fill:true,pointRadius:3,pointBackgroundColor:'#16a34a',pointBorderColor:'#fff',pointBorderWidth:2},
+      {label:'Negative',data:[15,15,18,14,13,17],borderColor:'#dc2626',backgroundColor:'rgba(220,38,38,.04)',tension:.4,fill:true,pointRadius:3,pointBackgroundColor:'#dc2626',pointBorderColor:'#fff',pointBorderWidth:2},
+      {label:'Neutral', data:[30,25,30,23,22,15],borderColor:'#d97706',backgroundColor:'rgba(217,119,6,.04)', tension:.4,fill:true,pointRadius:3,pointBackgroundColor:'#d97706',pointBorderColor:'#fff',pointBorderWidth:2}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{backgroundColor:'#0b0f1a',titleColor:'#6b7a99',bodyColor:'#e5e7eb',padding:10,cornerRadius:8,callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y}%`}}},scales:{x:{grid:{display:false},ticks:{font:{size:10,family:'Geist Mono'},color:'#9ca3af'}},y:{grid:{color:'#f3f4f6',drawBorder:false},ticks:{font:{size:10,family:'Geist Mono'},color:'#9ca3af',callback:v=>v+'%'},max:80,min:0}}}
+  });
+
+  new Chart(document.getElementById('donutChart').getContext('2d'),{
+    type:'doughnut',
+    data:{datasets:[{data:[68,15,17],backgroundColor:['#16a34a','#d97706','#dc2626'],borderWidth:0,hoverOffset:4}]},
+    options:{cutout:'72%',responsive:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#0b0f1a',bodyColor:'#e5e7eb',callbacks:{label:c=>` ${['Positive','Neutral','Negative'][c.dataIndex]}: ${c.parsed}%`}}}}
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ReviewPulse — Review Intelligence</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Geist+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --accent: #6366f1;
+    --accent-light: #818cf8;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --blue: #3b82f6;
+  }
+  * { font-family: 'Syne', sans-serif; }
+  .mono { font-family: 'Geist Mono', monospace; }
+  body { background: #f8f9fc; }
+
+  /* Sidebar */
+  .sidebar { background: #0f1117; min-height: 100vh; width: 240px; flex-shrink: 0; }
+  .nav-item { display:flex; align-items:center; gap:10px; padding:9px 16px; border-radius:8px; font-size:13.5px; font-weight:500; color:#6b7280; cursor:pointer; margin:1px 8px; transition:all .15s; }
+  .nav-item:hover { background:rgba(255,255,255,.05); color:#e5e7eb; }
+  .nav-item.active { background:rgba(99,102,241,.15); color:#818cf8; }
+  .nav-badge { margin-left:auto; background:#ef4444; color:#fff; font-size:10px; padding:1px 6px; border-radius:100px; font-family:'Geist Mono',monospace; }
+
+  /* Cards */
+  .card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; }
+  .kpi-card { transition: box-shadow .2s, transform .2s; }
+  .kpi-card:hover { box-shadow:0 8px 30px rgba(0,0,0,.08); transform:translateY(-2px); }
+
+  /* Sentiment bar */
+  .sent-track { height:6px; background:#f3f4f6; border-radius:3px; overflow:hidden; }
+  .sent-fill { height:100%; border-radius:3px; transition:width 1.2s cubic-bezier(.34,1.56,.64,1); }
+
+  /* Review table */
+  table { width:100%; border-collapse:collapse; }
+  thead th { text-align:left; font-size:11px; font-weight:600; color:#9ca3af; letter-spacing:.08em; text-transform:uppercase; padding:10px 16px; border-bottom:1px solid #f3f4f6; }
+  tbody tr { border-bottom:1px solid #f9fafb; transition:background .15s; cursor:pointer; }
+  tbody tr:hover { background:#f8f9ff; }
+  tbody td { padding:12px 16px; font-size:13px; color:#374151; vertical-align:middle; }
+  tbody tr:last-child { border-bottom:none; }
+
+  /* Tags */
+  .tag { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:100px; font-size:11px; font-weight:600; }
+  .tag-pos { background:#dcfce7; color:#16a34a; }
+  .tag-neg { background:#fee2e2; color:#dc2626; }
+  .tag-neu { background:#fef9c3; color:#ca8a04; }
+
+  /* Platform badge */
+  .pbadge { display:inline-block; padding:2px 8px; border-radius:5px; font-size:10.5px; font-weight:700; letter-spacing:.04em; }
+  .p-amazon { background:#fff3cd; color:#b45309; }
+  .p-flipkart { background:#dbeafe; color:#1d4ed8; }
+  .p-google { background:#dcfce7; color:#15803d; }
+  .p-myntra { background:#fce7f3; color:#be185d; }
+  .p-nykaa { background:#f3e8ff; color:#7e22ce; }
+
+  /* Stars */
+  .stars { color:#f59e0b; letter-spacing:1px; font-size:12px; }
+
+  /* Status pill */
+  .status { display:inline-block; padding:2px 8px; border-radius:100px; font-size:10px; font-weight:700; letter-spacing:.06em; }
+  .s-open { background:#fee2e2; color:#dc2626; }
+  .s-replied { background:#dcfce7; color:#16a34a; }
+  .s-pending { background:#fef9c3; color:#ca8a04; }
+
+  /* Topic cluster */
+  .topic-chip { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:8px; border:1px solid #e5e7eb; font-size:12px; font-weight:600; color:#374151; cursor:pointer; transition:all .15s; background:#fff; }
+  .topic-chip:hover, .topic-chip.active { border-color:var(--accent); color:var(--accent); background:#eef2ff; }
+  .topic-count { background:#e5e7eb; color:#6b7280; font-size:10px; padding:1px 6px; border-radius:100px; }
+  .topic-chip.active .topic-count { background:#c7d2fe; color:#4338ca; }
+
+  /* Insight card */
+  .insight-card { border-left:3px solid; padding:14px 16px; border-radius:0 10px 10px 0; background:#fff; }
+  .insight-card.critical { border-color:#ef4444; background:#fff5f5; }
+  .insight-card.positive { border-color:#22c55e; background:#f0fdf4; }
+  .insight-card.opportunity { border-color:#f59e0b; background:#fffbeb; }
+  .insight-card.warning { border-color:#3b82f6; background:#eff6ff; }
+
+  /* Chart tooltip */
+  .chartjs-tooltip { background:#0f1117 !important; border-radius:8px !important; }
+
+  /* Composer */
+  .composer-area { width:100%; border:1px solid #e5e7eb; border-radius:10px; padding:12px; font-size:13px; color:#374151; resize:none; outline:none; font-family:'Syne',sans-serif; transition:border-color .2s; background:#f9fafb; line-height:1.6; }
+  .composer-area:focus { border-color:var(--accent); background:#fff; box-shadow:0 0 0 3px rgba(99,102,241,.1); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width:5px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:#d1d5db; border-radius:4px; }
+
+  /* Animations */
+  @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+  .anim { animation: fadeUp .5s ease both; }
+  .anim-1 { animation-delay:.05s; } .anim-2 { animation-delay:.1s; } .anim-3 { animation-delay:.15s; }
+  .anim-4 { animation-delay:.2s; } .anim-5 { animation-delay:.25s; } .anim-6 { animation-delay:.3s; }
+
+  /* Live pulse */
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
+  .live-dot { width:7px; height:7px; border-radius:50%; background:#22c55e; display:inline-block; animation:pulse 2s infinite; }
+
+  /* Trend pill */
+  .trend-up { color:#16a34a; background:#dcfce7; padding:2px 7px; border-radius:100px; font-size:11px; font-weight:700; }
+  .trend-down { color:#dc2626; background:#fee2e2; padding:2px 7px; border-radius:100px; font-size:11px; font-weight:700; }
+
+  /* Alert banner */
+  .alert-banner { background:linear-gradient(135deg,#fff5f5,#fef2f2); border:1px solid #fecaca; border-radius:12px; }
+
+  /* Responsive */
+  @media(max-width:1024px){
+    .sidebar{display:none}
+    .main-content{margin-left:0!important}
+  }
+</style>
+</head>
+<body class="flex">
+
+<!-- ── SIDEBAR ── -->
+<aside class="sidebar flex flex-col py-6">
+
+  <div class="px-6 pb-5 border-b border-white/10">
+    <div class="text-white font-bold text-lg tracking-tight">Review<span class="text-indigo-400">Pulse</span></div>
+    <div class="text-xs text-gray-500 mt-1 mono">v2.4.1 · 4 platforms</div>
+  </div>
+
+  <nav class="flex-1 pt-4 overflow-y-auto">
+    <div class="px-6 pb-2 pt-2">
+      <span class="text-xs font-semibold text-gray-600 uppercase tracking-widest">Overview</span>
+    </div>
+    <div class="nav-item active">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Sentiment Trends
+    </div>
+    <div class="nav-item">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Response Time
+    </div>
+
+    <div class="px-6 pb-2 pt-5">
+      <span class="text-xs font-semibold text-gray-600 uppercase tracking-widest">Reviews</span>
+    </div>
+    <div class="nav-item">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Inbox
+      <span class="nav-badge">47</span>
+    </div>
+    <div class="nav-item">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      Responded
+    </div>
+    <div class="nav-item">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Flagged Critical
+      <span class="nav-badge">12</span>
+    </div>
+
+    <div class="px-6 pb-2 pt-5">
+      <span class="text-xs font-semibold text-gray-600 uppercase tracking-widest">Intelligence</span>
+    </div>
+    <div class="nav-item">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      AI Insights
+    </div>
+    <div class="nav-item">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Competitors
+    </div>
+    <div class="nav-item">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Weekly Report
+    </div>
+
+    <div class="px-6 pb-2 pt-5">
+      <span class="text-xs font-semibold text-gray-600 uppercase tracking-widest">Settings</span>
+    </div>
+    <div class="nav-item">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>
+      Integrations
+    </div>
+  </nav>
+
+  <div class="px-4 pt-4 border-t border-white/10">
+    <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 cursor-pointer">
+      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">SK</div>
+      <div>
+        <div class="text-white text-xs font-semibold">Sneha Kapoor</div>
+        <div class="text-gray-500 text-xs mono">Brand Manager</div>
+      </div>
+      <svg class="ml-auto text-gray-600" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+    </div>
+  </div>
+</aside>
+
+<!-- ── MAIN ── -->
+<div class="flex-1 flex flex-col min-h-screen overflow-auto">
+
+  <!-- TOP NAV -->
+  <header class="bg-white border-b border-gray-100 px-8 py-4 flex items-center justify-between sticky top-0 z-50">
+    <div>
+      <h1 class="text-[17px] font-bold text-gray-900">Review Command Centre</h1>
+      <p class="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5">
+        <span class="live-dot"></span>
+        Synced · Amazon, Flipkart, Google, Myntra · Last updated 3 min ago
+      </p>
+    </div>
+    <div class="flex items-center gap-3">
+      <!-- Alert banner pill -->
+      <div class="alert-banner flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-red-600 cursor-pointer">
+        <svg width="13" height="13" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm0 3.5L20.5 19h-17L12 5.5zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/></svg>
+        12 critical reviews need response
+      </div>
+      <select class="text-xs border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-600 cursor-pointer outline-none font-semibold">
+        <option>Last 30 days</option>
+        <option>Last 7 days</option>
+        <option>Last 90 days</option>
+      </select>
+      <button class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        Sync Now
+      </button>
+      <button class="flex items-center gap-2 border border-gray-200 text-gray-600 text-xs font-semibold px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export CSV
+      </button>
+    </div>
+  </header>
+
+  <!-- PAGE BODY -->
+  <main class="flex-1 p-8 space-y-6">
+
+    <!-- ── PLATFORM FILTER ROW ── -->
+    <div class="flex items-center gap-2 flex-wrap anim anim-1">
+      <span class="text-xs font-semibold text-gray-400 uppercase tracking-widest mr-1">Filter:</span>
+      <button onclick="setPlatform(this,'all')" class="platform-btn active topic-chip" data-platform="all">All Platforms <span class="topic-count">3,000</span></button>
+      <button onclick="setPlatform(this,'amazon')" class="platform-btn topic-chip" data-platform="amazon">🟠 Amazon <span class="topic-count">1,240</span></button>
+      <button onclick="setPlatform(this,'flipkart')" class="platform-btn topic-chip" data-platform="flipkart">🔵 Flipkart <span class="topic-count">780</span></button>
+      <button onclick="setPlatform(this,'google')" class="platform-btn topic-chip" data-platform="google">🟢 Google <span class="topic-count">490</span></button>
+      <button onclick="setPlatform(this,'myntra')" class="platform-btn topic-chip" data-platform="myntra">🩷 Myntra <span class="topic-count">310</span></button>
+      <button onclick="setPlatform(this,'nykaa')" class="platform-btn topic-chip" data-platform="nykaa">🟣 Nykaa <span class="topic-count">180</span></button>
+    </div>
+
+    <!-- ── KPI ROW ── -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 anim anim-2">
+
+      <div class="card kpi-card p-5">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Total Reviews</p>
+            <p class="text-3xl font-bold text-gray-900 mt-2 mono">3,000</p>
+            <p class="text-xs text-gray-400 mt-1.5">This month</p>
+          </div>
+          <div class="trend-up mt-1">↑ 18%</div>
+        </div>
+        <div class="mt-4 flex items-center gap-2">
+          <div class="text-xs text-gray-400">vs last month <span class="font-semibold text-gray-600">2,542</span></div>
+        </div>
+      </div>
+
+      <div class="card kpi-card p-5">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Positive Sentiment</p>
+            <p class="text-3xl font-bold text-green-600 mt-2 mono">68%</p>
+            <p class="text-xs text-gray-400 mt-1.5">2,040 reviews</p>
+          </div>
+          <div class="trend-up mt-1">↑ 4%</div>
+        </div>
+        <div class="mt-4 sent-track">
+          <div class="sent-fill bg-green-500" style="width:68%"></div>
+        </div>
+      </div>
+
+      <div class="card kpi-card p-5">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Response Rate</p>
+            <p class="text-3xl font-bold text-indigo-600 mt-2 mono">43%</p>
+            <p class="text-xs text-gray-400 mt-1.5">1,290 replied</p>
+          </div>
+          <div class="trend-down mt-1">↓ 7%</div>
+        </div>
+        <div class="mt-4 sent-track">
+          <div class="sent-fill bg-indigo-500" style="width:43%"></div>
+        </div>
+      </div>
+
+      <div class="card kpi-card p-5">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Avg. Rating</p>
+            <p class="text-3xl font-bold text-yellow-500 mt-2 mono">4.1 ★</p>
+            <p class="text-xs text-gray-400 mt-1.5">Across all platforms</p>
+          </div>
+          <div class="trend-down mt-1">↓ 0.3</div>
+        </div>
+        <div class="mt-3 flex items-center gap-1">
+          <div class="text-xs text-red-500 font-semibold bg-red-50 px-2 py-0.5 rounded-md">⚠ Amazon: 3.8 at risk</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── ROW 2: CHART + PLATFORM BREAKDOWN + SENTIMENT ── -->
+    <div class="grid grid-cols-12 gap-4 anim anim-3">
+
+      <!-- Sentiment Trend Line Chart -->
+      <div class="card col-span-12 lg:col-span-6 p-6">
+        <div class="flex items-start justify-between mb-5">
+          <div>
+            <h2 class="font-bold text-gray-900 text-[15px]">Sentiment Trend</h2>
+            <p class="text-xs text-gray-400 mt-0.5">6-month positive / negative / neutral</p>
+          </div>
+          <div class="flex gap-3 text-xs">
+            <span class="flex items-center gap-1.5 text-gray-500"><span class="inline-block w-3 h-0.5 bg-green-500 rounded"></span>Positive</span>
+            <span class="flex items-center gap-1.5 text-gray-500"><span class="inline-block w-3 h-0.5 bg-red-400 rounded"></span>Negative</span>
+            <span class="flex items-center gap-1.5 text-gray-500"><span class="inline-block w-3 h-0.5 bg-yellow-400 rounded"></span>Neutral</span>
+          </div>
+        </div>
+        <div style="height:190px">
+          <canvas id="sentimentChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Platform Breakdown -->
+      <div class="card col-span-12 lg:col-span-3 p-6">
+        <h2 class="font-bold text-gray-900 text-[15px] mb-1">Platform Breakdown</h2>
+        <p class="text-xs text-gray-400 mb-5">Avg. rating per source</p>
+        <div class="space-y-4">
+          <div>
+            <div class="flex justify-between text-xs mb-1.5"><span class="font-semibold text-gray-600 flex items-center gap-1.5"><span class="pbadge p-amazon">AMZ</span></span><span class="mono font-bold text-gray-800">3.8 ★ <span class="text-gray-400 font-normal">(1,240)</span></span></div>
+            <div class="sent-track"><div class="sent-fill bg-amber-400" style="width:76%"></div></div>
+          </div>
+          <div>
+            <div class="flex justify-between text-xs mb-1.5"><span class="font-semibold text-gray-600 flex items-center gap-1.5"><span class="pbadge p-flipkart">FLK</span></span><span class="mono font-bold text-gray-800">4.3 ★ <span class="text-gray-400 font-normal">(780)</span></span></div>
+            <div class="sent-track"><div class="sent-fill bg-blue-400" style="width:86%"></div></div>
+          </div>
+          <div>
+            <div class="flex justify-between text-xs mb-1.5"><span class="font-semibold text-gray-600 flex items-center gap-1.5"><span class="pbadge p-google">GGL</span></span><span class="mono font-bold text-gray-800">4.5 ★ <span class="text-gray-400 font-normal">(490)</span></span></div>
+            <div class="sent-track"><div class="sent-fill bg-green-400" style="width:90%"></div></div>
+          </div>
+          <div>
+            <div class="flex justify-between text-xs mb-1.5"><span class="font-semibold text-gray-600 flex items-center gap-1.5"><span class="pbadge p-myntra">MYN</span></span><span class="mono font-bold text-gray-800">3.6 ★ <span class="text-gray-400 font-normal">(310)</span></span></div>
+            <div class="sent-track"><div class="sent-fill bg-pink-400" style="width:72%"></div></div>
+          </div>
+          <div>
+            <div class="flex justify-between text-xs mb-1.5"><span class="font-semibold text-gray-600 flex items-center gap-1.5"><span class="pbadge p-nykaa">NYK</span></span><span class="mono font-bold text-gray-800">4.1 ★ <span class="text-gray-400 font-normal">(180)</span></span></div>
+            <div class="sent-track"><div class="sent-fill bg-purple-400" style="width:82%"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sentiment Donut + Response KPIs -->
+      <div class="card col-span-12 lg:col-span-3 p-6 flex flex-col">
+        <h2 class="font-bold text-gray-900 text-[15px] mb-1">This Month</h2>
+        <p class="text-xs text-gray-400 mb-4">Overall sentiment split</p>
+        <div class="flex justify-center mb-4">
+          <canvas id="donutChart" width="130" height="130"></canvas>
+        </div>
+        <div class="space-y-2.5 mt-auto">
+          <div class="flex items-center justify-between">
+            <span class="flex items-center gap-2 text-xs text-gray-500"><span class="w-2 h-2 rounded-full bg-green-500 inline-block"></span>Positive</span>
+            <span class="mono text-xs font-bold text-gray-800">68% · 2,040</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="flex items-center gap-2 text-xs text-gray-500"><span class="w-2 h-2 rounded-full bg-yellow-400 inline-block"></span>Neutral</span>
+            <span class="mono text-xs font-bold text-gray-800">15% · 450</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="flex items-center gap-2 text-xs text-gray-500"><span class="w-2 h-2 rounded-full bg-red-400 inline-block"></span>Negative</span>
+            <span class="mono text-xs font-bold text-gray-800">17% · 510</span>
+          </div>
+          <div class="border-t border-gray-100 pt-2.5 mt-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-gray-400">Avg. response time</span>
+              <span class="mono text-xs font-bold text-orange-500">38 hrs</span>
+            </div>
+            <div class="flex items-center justify-between mt-1">
+              <span class="text-xs text-gray-400">Unresponded critical</span>
+              <span class="mono text-xs font-bold text-red-500">47</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TOPIC CLUSTERS ── -->
+    <div class="card p-6 anim anim-4">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="font-bold text-gray-900 text-[15px]">Topic Clusters</h2>
+          <p class="text-xs text-gray-400 mt-0.5">AI-detected recurring themes · click to filter reviews</p>
+        </div>
+        <span class="text-xs text-indigo-600 font-semibold cursor-pointer hover:underline">View all topics →</span>
+      </div>
+      <div class="flex flex-wrap gap-2" id="topicClusters">
+        <button onclick="setTopic(this)" class="topic-chip active" data-topic="all">All Topics <span class="topic-count">3,000</span></button>
+        <button onclick="setTopic(this)" class="topic-chip" data-topic="sizing">📐 Sizing / Fit <span class="topic-count" style="background:#fee2e2;color:#dc2626">127 ↑</span></button>
+        <button onclick="setTopic(this)" class="topic-chip" data-topic="delivery">🚚 Delivery Speed <span class="topic-count">98</span></button>
+        <button onclick="setTopic(this)" class="topic-chip" data-topic="quality">💎 Product Quality <span class="topic-count">211</span></button>
+        <button onclick="setTopic(this)" class="topic-chip" data-topic="packaging">📦 Packaging <span class="topic-count" style="background:#dcfce7;color:#16a34a">183 ↑</span></button>
+        <button onclick="setTopic(this)" class="topic-chip" data-topic="returns">↩️ Returns / Refund <span class="topic-count">74</span></button>
+        <button onclick="setTopic(this)" class="topic-chip" data-topic="price">💰 Price Value <span class="topic-count">92</span></button>
+        <button onclick="setTopic(this)" class="topic-chip" data-topic="language">🌐 Language / Manual <span class="topic-count">34</span></button>
+        <button onclick="setTopic(this)" class="topic-chip" data-topic="fake">⚠️ Fake Product <span class="topic-count" style="background:#fee2e2;color:#dc2626">29 ↑</span></button>
+      </div>
+    </div>
+
+    <!-- ── REVIEW TABLE + AI INSIGHTS ── -->
+    <div class="grid grid-cols-12 gap-4 anim anim-5">
+
+      <!-- Review Table -->
+      <div class="card col-span-12 lg:col-span-8 overflow-hidden">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h2 class="font-bold text-gray-900 text-[15px]">Recent Reviews</h2>
+            <p class="text-xs text-gray-400 mt-0.5">Sorted by urgency · unresponded first</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="text" placeholder="Search reviews..." class="text-xs border border-gray-200 rounded-lg px-3 py-1.5 outline-none text-gray-600 w-40 focus:border-indigo-400 transition-colors"/>
+            <select class="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-600 cursor-pointer outline-none">
+              <option>All Ratings</option>
+              <option>1–2 ★</option>
+              <option>3 ★</option>
+              <option>4–5 ★</option>
+            </select>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table>
+            <thead>
+              <tr>
+                <th>Reviewer</th>
+                <th>Platform</th>
+                <th>Rating</th>
+                <th>Sentiment</th>
+                <th>Topic</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="reviewTable">
+              <!-- Injected by JS -->
+            </tbody>
+          </table>
+        </div>
+        <div class="px-6 py-3 border-t border-gray-100 flex items-center justify-between">
+          <span class="text-xs text-gray-400 mono">Showing 8 of 3,000 reviews</span>
+          <div class="flex items-center gap-1">
+            <button class="text-xs px-3 py-1 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">← Prev</button>
+            <button class="text-xs px-3 py-1 bg-indigo-600 text-white rounded-lg">1</button>
+            <button class="text-xs px-3 py-1 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">2</button>
+            <button class="text-xs px-3 py-1 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">3</button>
+            <button class="text-xs px-3 py-1 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">Next →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Insights -->
+      <div class="col-span-12 lg:col-span-4 flex flex-col gap-4">
+
+        <div class="card p-5">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-6 h-6 rounded-lg bg-indigo-100 flex items-center justify-center">
+              <svg width="13" height="13" fill="none" stroke="#6366f1" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            </div>
+            <h2 class="font-bold text-gray-900 text-[15px]">AI Insights</h2>
+            <span class="text-xs bg-indigo-50 text-indigo-600 font-bold px-2 py-0.5 rounded-md ml-auto">4 new</span>
+          </div>
+          <div class="space-y-3">
+
+            <div class="insight-card critical">
+              <div class="flex items-start gap-2">
+                <span class="text-sm mt-0.5">🚨</span>
+                <div>
+                  <p class="text-xs font-bold text-gray-800">Sizing spike on Myntra</p>
+                  <p class="text-xs text-gray-500 mt-0.5 leading-relaxed">127 reviews in 7 days mention wrong fit — likely linked to size chart update on Mar 12.</p>
+                  <button class="text-xs text-red-600 font-semibold mt-2 hover:underline">→ Fix size chart</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="insight-card positive">
+              <div class="flex items-start gap-2">
+                <span class="text-sm mt-0.5">📈</span>
+                <div>
+                  <p class="text-xs font-bold text-gray-800">Packaging praised consistently</p>
+                  <p class="text-xs text-gray-500 mt-0.5 leading-relaxed">183 reviews mention packaging positively since new design. Customers sharing unboxing reels.</p>
+                  <button class="text-xs text-green-600 font-semibold mt-2 hover:underline">→ Amplify on social</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="insight-card opportunity">
+              <div class="flex items-start gap-2">
+                <span class="text-sm mt-0.5">💡</span>
+                <div>
+                  <p class="text-xs font-bold text-gray-800">Regional language gap</p>
+                  <p class="text-xs text-gray-500 mt-0.5 leading-relaxed">89 reviews request Hindi / regional guide. Low effort, high satisfaction impact.</p>
+                  <button class="text-xs text-yellow-600 font-semibold mt-2 hover:underline">→ Add to backlog</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="insight-card warning">
+              <div class="flex items-start gap-2">
+                <span class="text-sm mt-0.5">⚠️</span>
+                <div>
+                  <p class="text-xs font-bold text-gray-800">Amazon rating at risk</p>
+                  <p class="text-xs text-gray-500 mt-0.5 leading-relaxed">Rating fell 4.4 → 3.8 in 14 days. 23 critical reviews unresponded. Act within 24h.</p>
+                  <button class="text-xs text-blue-600 font-semibold mt-2 hover:underline">→ View critical reviews</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- AI Reply Composer -->
+        <div class="card p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <div class="w-5 h-5 rounded bg-indigo-100 flex items-center justify-center">
+              <svg width="11" height="11" fill="none" stroke="#6366f1" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <h3 class="text-xs font-bold text-gray-700 uppercase tracking-widest">AI Reply Composer</h3>
+          </div>
+          <div class="text-xs text-gray-400 mb-2">Drafting for: <span class="font-semibold text-gray-600">Priya M. · Amazon · 2★</span></div>
+          <textarea class="composer-area" rows="3" placeholder="Click 'Reply with AI' on any review to generate a response here...">Thank you for your feedback, Priya. We sincerely apologise for the wrong item being shipped — this is not the experience we want for you. We've raised a priority replacement request and our team will contact you within 24 hours.</textarea>
+          <div class="flex items-center justify-between mt-3">
+            <div class="flex gap-1.5">
+              <button class="text-xs px-2.5 py-1 border border-gray-200 rounded-lg text-gray-500 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600 transition-colors font-semibold">Empathetic</button>
+              <button class="text-xs px-2.5 py-1 border border-gray-200 rounded-lg text-gray-500 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600 transition-colors font-semibold">Formal</button>
+              <button class="text-xs px-2.5 py-1 border border-gray-200 rounded-lg text-gray-500 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600 transition-colors font-semibold">Concise</button>
+            </div>
+            <button class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors">Send ↗</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── RESPONSE METRICS ROW ── -->
+    <div class="grid grid-cols-3 gap-4 anim anim-6">
+      <div class="card p-5">
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Response Rate Goal</p>
+        <div class="flex items-end gap-2">
+          <span class="text-2xl font-bold mono text-indigo-600">43%</span>
+          <span class="text-xs text-gray-400 pb-1">of 80% target</span>
+        </div>
+        <div class="mt-3 sent-track">
+          <div class="sent-fill bg-indigo-400" style="width:43%"></div>
+        </div>
+        <p class="text-xs text-gray-400 mt-2">Need to reply to <span class="font-semibold text-gray-600 mono">1,107</span> more reviews to hit goal</p>
+      </div>
+      <div class="card p-5">
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Avg. Time to Respond</p>
+        <div class="flex items-end gap-2">
+          <span class="text-2xl font-bold mono text-orange-500">38 hrs</span>
+          <span class="trend-down text-xs">↑ 12 hrs</span>
+        </div>
+        <p class="text-xs text-gray-400 mt-3">Amazon recommends responding within <span class="font-semibold text-gray-600">24 hrs</span> to protect ranking</p>
+      </div>
+      <div class="card p-5">
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">NPS Proxy Score</p>
+        <div class="flex items-end gap-2">
+          <span class="text-2xl font-bold mono text-green-600">+34</span>
+          <span class="trend-up text-xs">↑ 8 pts</span>
+        </div>
+        <p class="text-xs text-gray-400 mt-3">Derived from 4–5★ (promoters) vs 1–2★ (detractors) ratio</p>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ── SCRIPTS ── -->
+<script>
+  // Review data
+  const reviews = [
+    { name:"Priya M.", platform:"Amazon", pbadge:"p-amazon", plabel:"Amazon", rating:2, stars:"★★☆☆☆", sentiment:"neg", sentLabel:"Negative", topic:"Delivery", status:"open", statusLabel:"Open", date:"2h ago", text:"Wrong item shipped, packaging damaged." },
+    { name:"Rahul T.", platform:"Google", pbadge:"p-google", plabel:"Google", rating:5, stars:"★★★★★", sentiment:"pos", sentLabel:"Positive", topic:"Quality", status:"replied", statusLabel:"Replied", date:"5h ago", text:"Love it! Already recommended to friends." },
+    { name:"Anjali S.", platform:"Flipkart", pbadge:"p-flipkart", plabel:"Flipkart", rating:3, stars:"★★★☆☆", sentiment:"neu", sentLabel:"Neutral", topic:"Language", status:"pending", statusLabel:"Pending", date:"Yesterday", text:"Delivery took 10 days. No Hindi manual." },
+    { name:"Kiran V.", platform:"Myntra", pbadge:"p-myntra", plabel:"Myntra", rating:1, stars:"★☆☆☆☆", sentiment:"neg", sentLabel:"Negative", topic:"Sizing", status:"open", statusLabel:"Open", date:"Yesterday", text:"Size chart wrong. Returns process painful." },
+    { name:"Meena R.", platform:"Nykaa", pbadge:"p-nykaa", plabel:"Nykaa", rating:4, stars:"★★★★☆", sentiment:"pos", sentLabel:"Positive", topic:"Packaging", status:"replied", statusLabel:"Replied", date:"2d ago", text:"Beautiful packaging, product great value." },
+    { name:"Suresh P.", platform:"Amazon", pbadge:"p-amazon", plabel:"Amazon", rating:1, stars:"★☆☆☆☆", sentiment:"neg", sentLabel:"Negative", topic:"Fake", status:"open", statusLabel:"Open", date:"2d ago", text:"Received a fake product. Not original." },
+    { name:"Deepa K.", platform:"Flipkart", pbadge:"p-flipkart", plabel:"Flipkart", rating:5, stars:"★★★★★", sentiment:"pos", sentLabel:"Positive", topic:"Quality", status:"replied", statusLabel:"Replied", date:"3d ago", text:"Exactly as described. Very fast delivery!" },
+    { name:"Arjun N.", platform:"Google", pbadge:"p-google", plabel:"Google", rating:2, stars:"★★☆☆☆", sentiment:"neg", sentLabel:"Negative", topic:"Returns", status:"pending", statusLabel:"Pending", date:"3d ago", text:"Return request ignored for 2 weeks." },
+  ];
+
+  function buildTable() {
+    const tbody = document.getElementById('reviewTable');
+    tbody.innerHTML = reviews.map((r,i) => `
+      <tr style="animation:fadeUp .4s ease ${i*0.05}s both">
+        <td>
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-xs font-bold text-indigo-600 flex-shrink-0">${r.name[0]}</div>
+            <div>
+              <div class="font-semibold text-gray-800 text-xs">${r.name}</div>
+              <div class="text-gray-400 text-xs mono" style="font-size:10px">${r.text.substring(0,32)}…</div>
+            </div>
+          </div>
+        </td>
+        <td><span class="pbadge ${r.pbadge}">${r.plabel}</span></td>
+        <td><span class="stars">${r.stars}</span></td>
+        <td><span class="tag tag-${r.sentiment}">${r.sentLabel}</span></td>
+        <td><span class="text-xs text-gray-500 font-semibold">${r.topic}</span></td>
+        <td><span class="status s-${r.status}">${r.statusLabel}</span></td>
+        <td class="mono" style="font-size:11px;color:#9ca3af">${r.date}</td>
+        <td><button class="text-xs text-indigo-600 font-bold hover:underline whitespace-nowrap">Reply ✦</button></td>
+      </tr>
+    `).join('');
+  }
+
+  buildTable();
+
+  // Platform filter
+  function setPlatform(el, val) {
+    document.querySelectorAll('.platform-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  // Topic filter
+  function setTopic(el) {
+    document.querySelectorAll('#topicClusters button').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  // Sentiment Line Chart
+  const ctx = document.getElementById('sentimentChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: ['Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb'],
+      datasets: [
+        {
+          label: 'Positive',
+          data: [55, 60, 52, 63, 65, 68],
+          borderColor: '#22c55e',
+          backgroundColor: 'rgba(34,197,94,.07)',
+          tension: 0.4, fill: true, pointRadius: 4,
+          pointBackgroundColor: '#22c55e', pointBorderColor: '#fff', pointBorderWidth: 2
+        },
+        {
+          label: 'Negative',
+          data: [15, 15, 18, 14, 13, 17],
+          borderColor: '#ef4444',
+          backgroundColor: 'rgba(239,68,68,.04)',
+          tension: 0.4, fill: true, pointRadius: 4,
+          pointBackgroundColor: '#ef4444', pointBorderColor: '#fff', pointBorderWidth: 2
+        },
+        {
+          label: 'Neutral',
+          data: [30, 25, 30, 23, 22, 15],
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245,158,11,.04)',
+          tension: 0.4, fill: true, pointRadius: 4,
+          pointBackgroundColor: '#f59e0b', pointBorderColor: '#fff', pointBorderWidth: 2
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0f1117',
+          titleColor: '#9ca3af',
+          bodyColor: '#e5e7eb',
+          padding: 10,
+          cornerRadius: 8,
+          callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y}%` }
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11, family: 'Geist Mono' }, color: '#9ca3af' } },
+        y: {
+          grid: { color: '#f3f4f6', drawBorder: false },
+          ticks: { font: { size: 11, family: 'Geist Mono' }, color: '#9ca3af', callback: v => v + '%' },
+          max: 80, min: 0
+        }
+      }
+    }
+  });
+
+  // Donut Chart
+  const dctx = document.getElementById('donutChart').getContext('2d');
+  new Chart(dctx, {
+    type: 'doughnut',
+    data: {
+      datasets: [{
+        data: [68, 15, 17],
+        backgroundColor: ['#22c55e', '#f59e0b', '#ef4444'],
+        borderWidth: 0,
+        hoverOffset: 4
+      }]
+    },
+    options: {
+      cutout: '72%',
+      responsive: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: { label: ctx => ` ${['Positive','Neutral','Negative'][ctx.dataIndex]}: ${ctx.parsed}%` }
+        }
+      }
+    }
+  });
+</script>
+</body>
+</html>
